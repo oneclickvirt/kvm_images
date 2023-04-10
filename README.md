@@ -1,6 +1,6 @@
 # Images
 
-Images列表，已预开启安装cloudinit，开启SSH登陆，预设值SSH监听V4和V6的22端口
+Images列表，已预开启安装cloudinit，开启SSH登陆，预设值SSH监听V4和V6的22端口，开启允许密码验证登陆，开启允许ROOT登陆
 
 感谢
 
