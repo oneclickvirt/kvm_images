@@ -2,8 +2,15 @@
 
 Images列表，已预开启安装cloudinit，开启SSH登陆，预设值SSH监听V4和V6的22端口，开启允许密码验证登陆，开启允许ROOT登陆
 
+### 注意
 
-centos9-stream centos8-stream centos7 almalinux8 almalinux9 镜像开启允许密码验证登陆和开启允许ROOT登陆失败，待修复
+#### debian系，ubuntu系，archlinux系 
+
+上述镜像都没问题
+
+#### centos9-stream centos8-stream centos7 almalinux8 almalinux9 
+
+上述镜像开启允许密码验证登陆和开启允许ROOT登陆失败，待修复
 
 上述系统加载后需要在PVE的shell登陆后切换root权限，执行
 
@@ -18,15 +25,17 @@ systemctl restart ssh
 
 后修复允许通过密码进行SSH登陆
 
-debian系，ubuntu系，archlinux系 没问题
+#### alpine
 
-感谢
+镜像无能为力，待修复
+
+### 感谢
 
 https://down.idc.wiki/Image/realServer-Template/
 
 提供的原始系统镜像，原始镜像仅开启了cloudinit，其他一切未开启
 
-不要使用
+### 不要使用
 
 Source code (zip)
 
