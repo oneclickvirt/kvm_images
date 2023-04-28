@@ -12,7 +12,7 @@ Images列表，已预开启安装cloudinit，开启SSH登陆，预设值SSH监�
 
 上述镜像开启允许密码验证登陆和开启允许ROOT登陆失败，待修复
 
-上述系统加载后需要在PVE的shell登陆后切换root权限，执行
+上述系统加载后，需要在PVE的WEB端，找到对应虚拟机的shell或者NOVNC，登陆后切换root权限，执行
 
 ```
 sed -i 's/#PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
