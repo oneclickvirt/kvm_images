@@ -26,6 +26,8 @@ fedora33 - 5G
 
 fedora34 - 5G
 
+rockylinux8 - 10G
+
 上述镜像都没问题，已预开启安装cloudinit，开启SSH登陆，预设值SSH监听V4和V6的22端口，开启允许密码验证登陆
 
 #### 有问题镜像
