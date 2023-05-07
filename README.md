@@ -1,6 +1,6 @@
 # Images
 
-Images列表，已预开启安装cloudinit，开启SSH登陆，预设值SSH监听V4和V6的22端口，开启允许密码验证登陆
+Images列表，已预开启安装cloudinit，开启SSH登陆，预设SSH监听V4和V6的22端口，开启允许密码验证登陆
 
 ### 注意
 
@@ -27,8 +27,6 @@ fedora33 - 5G
 fedora34 - 5G
 
 opensuse-leap-15 - 10G
-
-上述镜像都没问题，已预开启安装cloudinit，开启SSH登陆，预设值SSH监听V4和V6的22端口，开启允许密码验证登陆
 
 #### 有问题镜像
 
