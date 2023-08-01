@@ -28,24 +28,6 @@ fedora34 - 5G
 
 opensuse-leap-15 - 10G
 
-#### 有问题镜像
-
-centos7 
-
-alpinelinux_v3_15 
-
-alpinelinux_v3_17 
-
-routeros_v6 
-
-routeros_v7 
-
-rockylinux8 
-
-QuTScloud_5.0.1 
-
-暂时无能为力，待修复
-
 ### v1.1
 
 Images列表，已预开启安装cloudinit，开启SSH登陆，预设SSH监听V4和V6的22端口，开启允许密码验证登陆，已预安装Qemu-guest-agent
@@ -71,5 +53,3 @@ https://down.idc.wiki/Image/realServer-Template/
 Source code (zip)
 
 Source code (tar.gz) 
-
-这两个包，是老的数据，未修改
