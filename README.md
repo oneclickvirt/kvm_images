@@ -60,8 +60,6 @@ archlinux系 - 2G
 
 centos9-stream - 10G
 
-centos8-stream - 10G
-
 almalinux8 - 10G
 
 fedora33 - 5G
