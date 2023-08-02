@@ -20,7 +20,7 @@ Releases中的镜像：
 
 镜像名称 - 已挂载硬盘大小(开设的虚拟机要比这个数值大)
 
-debian12、debian11 - 2G
+debian11、debian12 - 2G
 
 ubuntu18、ubuntu20、ubuntu22 - 2G
 
