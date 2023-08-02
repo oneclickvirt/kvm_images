@@ -2,7 +2,9 @@
 
 Releases中的镜像：
 
-已预开启安装cloudinit，开启SSH登陆，预设SSH监听V4和V6的22端口，开启允许密码验证登陆，开启允许root进行SSH登录
+已预开启安装cloudinit，开启SSH登陆，预设SSH监听V4和V6的22端口，开启允许密码验证登陆
+
+部分镜像开启允许root进行SSH登录
 
 默认用户名：```root```
 
