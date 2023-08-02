@@ -28,6 +28,8 @@ ubuntu18、ubuntu20、ubuntu22 - 2G
 
 centos7 - 2G
 
+fedora34 - 5G
+
 ## v1.1
 
 <details>
@@ -59,8 +61,6 @@ archlinux系 - 2G
 almalinux8 - 10G
 
 fedora33 - 5G
-
-fedora34 - 5G
 
 opensuse-leap-15 - 10G
 
