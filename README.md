@@ -18,12 +18,18 @@ Releases中的镜像：
 
 ## v2.0
 
+debian12、debian11 - 2G
+
+ubuntu18、ubuntu20、ubuntu22 - 2G
+
+centos7 - 2G
+
 ## v1.1
 
 <details>
 说明：
   
-已预开启安装cloudinit，开启SSH登陆，预设SSH监听V4和V6的22端口，开启允许密码验证登陆，已预安装Qemu-guest-agent
+在v1.0基础上预安装Qemu-guest-agent
 
 镜像名称 - 已挂载硬盘大小(开设的虚拟机要比这个数值大)
 
