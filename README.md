@@ -34,6 +34,8 @@ centos7 - 2G
 
 fedora34 - 5G
 
+alpinelinux_edge、alpinelinux_stable - 2G
+
 ## v1.1
 
 <details>
