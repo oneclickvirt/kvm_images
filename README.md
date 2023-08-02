@@ -62,8 +62,6 @@ centos8-stream - 10G
 
 almalinux8 - 10G
 
-almalinux9 - 10G
-
 fedora33 - 5G
 
 fedora34 - 5G
