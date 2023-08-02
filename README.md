@@ -39,8 +39,6 @@ debian系 - 2G
 
 ubuntu系 - 2G
 
-centos9-stream - 10G
-
 almalinux9 - 10G
 
 </details>
@@ -57,8 +55,6 @@ debian系 - 2G
 ubuntu系 - 2G
 
 archlinux系 - 2G
-
-centos9-stream - 10G
 
 almalinux8 - 10G
 
