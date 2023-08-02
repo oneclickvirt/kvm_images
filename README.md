@@ -12,6 +12,10 @@ Releases中的镜像：
 
 如果使用务必自行修改密码
 
+目前总的支持的镜像名字(已经过实机验证可使用)
+
+https://github.com/oneclickvirt/kvm_images/blob/main/list.text
+
 ## 目录
 
 - [v2.0](#v2.0)
