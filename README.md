@@ -36,6 +36,8 @@ fedora34 - 5G
 
 alpinelinux_edge、alpinelinux_stable - 2G
 
+rockylinux8 - 4G
+
 ## v1.1
 
 <details>
