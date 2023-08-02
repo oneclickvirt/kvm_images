@@ -1,6 +1,6 @@
 # kvm_images
 
-Images列表，已预开启安装cloudinit，开启SSH登陆，预设SSH监听V4和V6的22端口，开启允许密码验证登陆
+已预开启安装cloudinit，开启SSH登陆，预设SSH监听V4和V6的22端口，开启允许密码验证登陆，开启允许root进行SSH登录
 
 默认用户名：```root```
 
@@ -58,7 +58,7 @@ opensuse-leap-15 - 10G
 
 https://down.idc.wiki/Image/realServer-Template/
 
-提供的原始系统镜像，原始镜像仅开启了cloudinit，其他一切未开启
+提供的原始系统镜像，原始镜像仅开启了cloudinit，其他一切未开启，且不支持root进行SSH登录
 
 ## 不要使用
 
