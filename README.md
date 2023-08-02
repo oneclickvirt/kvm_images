@@ -39,8 +39,6 @@ debian系 - 2G
 
 ubuntu系 - 2G
 
-almalinux9 - 10G
-
 </details>
 
 ## v1.0
