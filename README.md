@@ -38,6 +38,12 @@ alpinelinux_edge、alpinelinux_stable - 2G
 
 rockylinux8 - 4G
 
+centos8-stream - 4G
+
+由于文件过大超过了2G限制，目前存储在朋友的git上
+
+https://git.ilolicon.dev/Ella-Alinda/images/src/branch/main/centos8-stream.qcow2
+
 ## v1.1
 
 <details>
