@@ -16,6 +16,12 @@ Releases中的镜像：
 
 https://github.com/oneclickvirt/kvm_images/blob/main/list.text
 
+每日拉取镜像进行修补和更新的仓库：
+
+https://github.com/oneclickvirt/pve_kvm_images
+
+会支持比较新的一些镜像
+
 ## 目录
 
 - [v2.0](#v2.0)
