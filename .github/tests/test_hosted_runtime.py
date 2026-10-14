@@ -72,6 +72,13 @@ class GuestAgentTests(unittest.TestCase):
                 self.assertIn('dhcp4: true',archive.extractfile('templates/network-config.tpl').read().decode())
 
 
+class CloudInitNetworkTests(unittest.TestCase):
+    def test_qemu_seed_uses_cloud_init_v1_dhcp(self):
+        self.assertEqual(
+            runtime.qemu_network_config(),
+            'version: 1\nconfig:\n  - type: physical\n    name: eth0\n    subnets:\n      - type: dhcp\n',
+        )
+
 
 class SSHTransportTests(unittest.TestCase):
     def test_password_is_only_in_subprocess_environment(self):

@@ -167,6 +167,10 @@ def ssh_command(port, key, script, password=None):
     return result.stdout.strip()
 
 
+def qemu_network_config():
+    return 'version: 1\nconfig:\n  - type: physical\n    name: eth0\n    subnets:\n      - type: dhcp\n'
+
+
 def qemu_test(folder, disk, provision_key=False):
     arch='arm64' if os.uname().machine=='aarch64' else 'amd64'
     accelerated=kvm_available()
@@ -180,7 +184,7 @@ def qemu_test(folder, disk, provision_key=False):
     seed=folder/'seed.img';user=folder/'user-data';meta=folder/'meta-data';network=folder/'network-config'
     user.write_text('#cloud-config\nssh_pwauth: false\ndisable_root: false\nusers:\n  - default\n  - name: root\n    lock_passwd: false\n    ssh_authorized_keys:\n      - '+public+'\n')
     meta.write_text('instance-id: hosted-'+uuid.uuid4().hex+'\nlocal-hostname: image-test\n')
-    network.write_text('version: 2\nethernets:\n  hosted:\n    match:\n      name: "e*"\n    dhcp4: true\n')
+    network.write_text(qemu_network_config())
     run(['cloud-localds','--network-config='+str(network),str(seed),str(user),str(meta)])
     consumer_password=None
     if provision_key:
