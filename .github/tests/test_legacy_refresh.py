@@ -56,14 +56,15 @@ class LegacyRefreshTests(unittest.TestCase):
                 self.assertFalse((root / 'disk.qcow2').exists())
 
     def test_fedora_ssh_repair_is_idempotent_and_failed_validation_never_publishes(self):
-        producer = self.source()
-        producer.assets.return_value = {'fedora34.qcow2': {'state': 'uploaded'}}
-        with mock.patch.dict(os.environ, GH_TOKEN='fixture'), mock.patch.object(refresh, 'Publisher', return_value=producer) as publisher, mock.patch.object(refresh, 'download'), mock.patch.object(refresh, 'validate_image', side_effect=RuntimeError('boot failed')), mock.patch.object(refresh.subprocess, 'run') as execute:
-            with self.assertRaisesRegex(RuntimeError, 'boot failed'):
-                refresh.refresh('fedora34')
-        self.assertEqual(publisher.call_count, 1)
-        self.assertEqual(execute.call_count, 2)
-        self.assertNotIn('release_assets.py', ' '.join(execute.call_args.args[0]))
+        for endpoint in ('fedora34', 'rockylinux8'):
+            producer = self.source()
+            producer.assets.return_value = {endpoint+'.qcow2': {'state': 'uploaded'}}
+            with mock.patch.dict(os.environ, GH_TOKEN='fixture'), mock.patch.object(refresh, 'Publisher', return_value=producer) as publisher, mock.patch.object(refresh, 'download'), mock.patch.object(refresh, 'validate_image', side_effect=RuntimeError('boot failed')), mock.patch.object(refresh.subprocess, 'run') as execute:
+                with self.assertRaisesRegex(RuntimeError, 'boot failed'):
+                    refresh.refresh(endpoint)
+            self.assertEqual(publisher.call_count, 1)
+            self.assertEqual(execute.call_count, 2)
+            self.assertNotIn('release_assets.py', ' '.join(execute.call_args.args[0]))
         command = execute.call_args.args[0][execute.call_args.args[0].index('--run-command') + 1]
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

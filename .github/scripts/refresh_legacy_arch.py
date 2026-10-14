@@ -35,6 +35,8 @@ ENDPOINTS = {
                     'image': 'alpinelinux_edge.qcow2', 'tag': 'v2.0'},
     'fedora34': {'source_repo': 'oneclickvirt/kvm_images', 'source_tag': 'v2.0',
                  'source_image': 'fedora34.qcow2', 'image': 'fedora34.qcow2', 'tag': 'v2.0'},
+    'rockylinux8': {'source_repo': 'oneclickvirt/kvm_images', 'source_tag': 'v2.0',
+                    'source_image': 'rockylinux8.qcow2', 'image': 'rockylinux8.qcow2', 'tag': 'v2.0'},
 }
 
 
@@ -74,9 +76,9 @@ def refresh(image):
     # Preserve the documented credentials of this legacy consumer endpoint.
     subprocess.run(['sudo','virt-customize','-a',str(filename),'--run-command',
                     "printf 'root:password\n' | chpasswd",'--no-network'],check=True,timeout=600)
-    if image == 'fedora34':
-        # The original endpoint advertises root/password, but its SSH daemon
-        # only offers GSSAPI. Repair that endpoint without changing its OS.
+    if image in ('fedora34', 'rockylinux8'):
+        # These endpoints advertise root/password, but their SSH daemons
+        # only offer GSSAPI. Repair access while keeping each original OS.
         command = """set -eu
 test -s /etc/ssh/sshd_config
 for config in /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf; do
