@@ -13,6 +13,13 @@ def download(publisher, asset, path):
     if asset.get('digest') and asset['digest']!='sha256:'+publisher.digest(path):raise ValueError('source image checksum mismatch')
 
 
+def validate_image(filename):
+    environment=os.environ.copy()
+    environment.pop('GH_TOKEN',None)
+    subprocess.run(['python3','.github/scripts/hosted_image_test.py','--file',str(filename),'--runtime','qemu'],
+                   check=True,timeout=4200,env=environment)
+
+
 def main():
     source=Publisher('oneclickvirt/pve_kvm_images',os.environ['GH_TOKEN'])
     release=source.request(source.base+'/releases/tags/archlinux')
@@ -22,7 +29,7 @@ def main():
     # Preserve the documented credentials of this legacy consumer endpoint.
     subprocess.run(['sudo','virt-customize','-a',str(filename),'--run-command',
                     "printf 'root:password\n' | chpasswd",'--no-network'],check=True,timeout=600)
-    subprocess.run(['python3','.github/scripts/hosted_image_test.py','--file',str(filename),'--runtime','qemu'],check=True,timeout=4200)
+    validate_image(filename)
     target=Publisher(os.environ['GITHUB_REPOSITORY'],os.environ['GH_TOKEN'])
     old_release=target.request(target.base+'/releases/tags/v1.0')
     old=target.assets(old_release['id']).get(filename.name)
