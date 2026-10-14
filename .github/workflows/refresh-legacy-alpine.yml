@@ -1,0 +1,29 @@
+name: Refresh maintained legacy Alpine image
+'on':
+  workflow_dispatch: null
+  schedule:
+  - cron: 17 1 * * 1
+permissions:
+  contents: write
+concurrency:
+  group: refresh-legacy-alpine
+  cancel-in-progress: false
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  LIBGUESTFS_BACKEND: direct
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+    - name: Prepare disposable VM runtime
+      run: bash .github/scripts/prepare_hosted_runtime.sh qemu
+    - name: Prepare offline image customization
+      run: bash .github/scripts/prepare_guestfs.sh
+    - name: Validate and replace legacy Alpine from its maintained public counterpart
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: python3 .github/scripts/refresh_legacy_arch.py --image alpine
