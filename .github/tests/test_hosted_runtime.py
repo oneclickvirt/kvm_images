@@ -93,12 +93,10 @@ class GuestAgentTests(unittest.TestCase):
 
 class CloudInitNetworkTests(unittest.TestCase):
     def test_qemu_seed_uses_mac_matched_cloud_init_v2_dhcp(self):
-        self.assertEqual(
-            runtime.qemu_network_config(),
-            'version: 2\nethernets:\n  hosted:\n    match:\n      macaddress: '
-            + runtime.HOSTED_NIC_MAC
-            + '\n    dhcp4: true\n',
-        )
+        network=yaml.safe_load(runtime.qemu_network_config())
+        self.assertEqual(network['version'],2)
+        self.assertEqual(network['ethernets']['hosted']['match']['macaddress'],runtime.HOSTED_NIC_MAC)
+        self.assertIs(network['ethernets']['hosted']['dhcp4'],True)
 
 
 class SSHTransportTests(unittest.TestCase):
