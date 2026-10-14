@@ -18,7 +18,7 @@ def published(publisher):
     else:raise RuntimeError('release pagination exceeded')
     assets={}
     for release in releases:
-        if release['draft'] or release['prerelease'] or release['tag_name']=='processed':continue
+        if release['draft'] or release['prerelease'] or release['tag_name'] in ('processed', 'legacy-archived'):continue
         for asset in publisher.assets(release['id']).values():
             name=asset['name']
             if asset.get('state')!='uploaded' or not asset.get('size') or not re.fullmatch(r'[A-Za-z0-9_.-]+\.(qcow2|zip|tar\.xz|tar\.zst)',name):continue

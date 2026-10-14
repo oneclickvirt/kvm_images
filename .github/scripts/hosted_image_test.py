@@ -275,6 +275,18 @@ def qemu_entropy_devices():
             '-device', 'virtio-rng-pci,rng=hosted-rng,max-bytes=1024,period=1000']
 
 
+def legacy_kernel_cpu_failure(console):
+    return 'kernel BUG at ' in console and 'arch/x86/kernel/alternative.c:' in console
+
+
+def qemu_cpu_devices(arch, accelerated, compatibility=False):
+    if compatibility:
+        if arch != 'amd64':
+            raise ValueError('legacy x86 CPU fallback requires AMD64')
+        return ['-cpu', 'qemu64', '-smp', '1']
+    return ['-cpu', 'host' if accelerated else 'max', '-smp', '2']
+
+
 def qemu_test(folder, disk):
     arch='arm64' if os.uname().machine=='aarch64' else 'amd64'
     accelerated=kvm_available()
@@ -304,7 +316,7 @@ def qemu_test(folder, disk):
         listener.bind(('127.0.0.1',0));port=listener.getsockname()[1]
     command=['qemu-system-aarch64' if arch=='arm64' else 'qemu-system-x86_64',
              '-machine','virt' if arch=='arm64' else 'q35','-accel','kvm' if accelerated else 'tcg,thread=multi',
-             '-cpu','host' if accelerated else 'max','-m','2048','-smp','2',
+             '-m','2048',
              '-display','none','-serial',f'file:{serial}','-monitor',f'unix:{monitor},server=on,wait=off',
              '-drive',f'file={overlay},format=qcow2,if=none,id=guestdisk','-drive',f'file={seed},format=raw,if=virtio',
              '-netdev',f'user,id=net0,hostfwd=tcp:127.0.0.1:{port}-:22',
@@ -314,7 +326,7 @@ def qemu_test(folder, disk):
     for bus in range(1,6):
         command+=['-device',f'pcie-root-port,id=hosted-port{bus},chassis={bus},bus=pcie.0,addr={bus+15:#x}']
     command+=qemu_network_device()
-    log=(folder/'qemu.log').open('wb');process=None;mode='UEFI';storage_mode='virtio';retry_reason=None;transport='QGA';ssh_password=None
+    log=(folder/'qemu.log').open('wb');process=None;mode='UEFI';storage_mode='virtio';retry_reason=None;transport='QGA';ssh_password=None;compatibility_cpu=False
     repository=os.environ.get('GITHUB_REPOSITORY','')
     legacy_password='oneclickvirt' if repository.endswith('/pve_kvm_images') else 'password' if repository.endswith('/kvm_images') else None
     def stop():
@@ -330,7 +342,7 @@ def qemu_test(folder, disk):
         devices=['-device','virtio-blk-pci,drive=guestdisk,bootindex=1']
         if storage=='scsi':devices=['-device','virtio-scsi-pci,id=guest-scsi','-device','scsi-hd,drive=guestdisk,bus=guest-scsi.0,bootindex=1']
         if storage=='sata':devices=['-device','ide-hd,drive=guestdisk,bus=ide.0,bootindex=1']
-        process=subprocess.Popen([command[0]]+devices+command[1:]+([] if bios else firmware(arch,folder)),
+        process=subprocess.Popen([command[0]]+qemu_cpu_devices(arch,accelerated,compatibility_cpu)+devices+command[1:]+([] if bios else firmware(arch,folder)),
                                  stdout=log,stderr=log,env=isolated_environment())
     initial_deadline=None
     readiness_budget=1500 if not accelerated else 600
@@ -371,6 +383,10 @@ def qemu_test(folder, disk):
                                   '\nShell>' in console or '\nShell> ' in console or
                                   'startup.nsh' in console and 'Press ' in console)
                 stalled_loader=firmware_without_kernel(console) and time.monotonic()-serial_changed>=90
+                if allow_bios and arch=='amd64' and not compatibility_cpu and legacy_kernel_cpu_failure(console):
+                    retry_reason='legacy-cpu'
+                    print('Legacy kernel instruction patching failed; retrying with one compatible x86 CPU within the same boot budget')
+                    return None
                 if allow_bios and arch=='amd64' and mode=='UEFI' and (firmware_shell or stalled_loader):
                     retry_reason='bios'
                     print('UEFI did not reach a guest kernel; retrying the image with SeaBIOS within the same boot budget')
@@ -390,10 +406,11 @@ def qemu_test(folder, disk):
     try:
         initial_deadline=time.monotonic()+readiness_budget
         start();boot=ready(allow_bios=True)
-        for _ in range(3):
+        for _ in range(4):
             if boot is not None:break
             next_bios=mode=='BIOS' or retry_reason=='bios'
-            next_storage=storage_mode if retry_reason=='bios' else retry_reason
+            next_storage=storage_mode if retry_reason in ('bios','legacy-cpu') else retry_reason
+            if retry_reason=='legacy-cpu':compatibility_cpu=True
             print('Retrying compatible VM boot: '+('BIOS' if next_bios else 'UEFI')+' '+next_storage)
             stop();start(bios=next_bios,storage=next_storage);boot=ready(allow_bios=True)
         if boot is None:raise RuntimeError('VM compatibility retry budget exhausted')

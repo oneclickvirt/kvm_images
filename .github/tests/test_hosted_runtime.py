@@ -165,6 +165,20 @@ class QEMUEntropyTests(unittest.TestCase):
         self.assertIn('period=1000', arguments[3])
 
 
+class LegacyCPURecoveryTests(unittest.TestCase):
+    def test_only_the_confirmed_x86_instruction_patching_failure_selects_fallback(self):
+        self.assertTrue(runtime.legacy_kernel_cpu_failure('kernel BUG at /build/linux/arch/x86/kernel/alternative.c:709!'))
+        for console in ['Kernel panic - not syncing: no root filesystem', 'kernel BUG at drivers/net/test.c:1!', 'Linux version 6.12']:
+            self.assertFalse(runtime.legacy_kernel_cpu_failure(console))
+
+    def test_compatible_cpu_keeps_kvm_available_and_does_not_affect_arm_defaults(self):
+        self.assertEqual(runtime.qemu_cpu_devices('amd64', True, True), ['-cpu', 'qemu64', '-smp', '1'])
+        self.assertEqual(runtime.qemu_cpu_devices('arm64', False), ['-cpu', 'max', '-smp', '2'])
+        self.assertEqual(runtime.qemu_cpu_devices('amd64', True), ['-cpu', 'host', '-smp', '2'])
+        with self.assertRaises(ValueError):
+            runtime.qemu_cpu_devices('arm64', True, True)
+
+
 class FirmwareFallbackTests(unittest.TestCase):
     def test_prior_kernel_does_not_hide_a_stalled_efi_loader_after_relabel_reboot(self):
         console = ('BdsDxe: starting Boot0001 "UEFI Misc Device"\n'

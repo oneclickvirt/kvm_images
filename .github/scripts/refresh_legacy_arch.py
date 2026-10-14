@@ -33,6 +33,8 @@ ENDPOINTS = {
                     'source_image': 'alpine_edge_edge_x86_64_default_kvm.zip',
                     'archive_member': 'disk.qcow2',
                     'image': 'alpinelinux_edge.qcow2', 'tag': 'v2.0'},
+    'fedora34': {'source_repo': 'oneclickvirt/kvm_images', 'source_tag': 'v2.0',
+                 'source_image': 'fedora34.qcow2', 'image': 'fedora34.qcow2', 'tag': 'v2.0'},
 }
 
 
@@ -72,6 +74,24 @@ def refresh(image):
     # Preserve the documented credentials of this legacy consumer endpoint.
     subprocess.run(['sudo','virt-customize','-a',str(filename),'--run-command',
                     "printf 'root:password\n' | chpasswd",'--no-network'],check=True,timeout=600)
+    if image == 'fedora34':
+        # The original endpoint advertises root/password, but its SSH daemon
+        # only offers GSSAPI. Repair that endpoint without changing its OS.
+        command = """set -eu
+test -s /etc/ssh/sshd_config
+for config in /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf; do
+  [ -f "$config" ] || continue
+  awk '!/^[[:space:]]*(PubkeyAuthentication|PasswordAuthentication|PermitRootLogin)[[:space:]]/' "$config" > "$config.hosted-auth"
+  cat "$config.hosted-auth" > "$config"
+  rm "$config.hosted-auth"
+done
+{ printf 'PubkeyAuthentication yes\\nPasswordAuthentication yes\\nPermitRootLogin yes\\n'; cat /etc/ssh/sshd_config; } > /etc/ssh/sshd_config.hosted-repair
+chmod 0600 /etc/ssh/sshd_config.hosted-repair
+mv /etc/ssh/sshd_config.hosted-repair /etc/ssh/sshd_config
+systemctl enable sshd
+"""
+        subprocess.run(['sudo','virt-customize','-a',str(filename),'--run-command',command,
+                        '--selinux-relabel','--no-network'],check=True,timeout=600)
     validate_image(filename)
     target=Publisher(os.environ['GITHUB_REPOSITORY'],os.environ['GH_TOKEN'])
     old_release=target.request(target.base+'/releases/tags/'+endpoint['tag'])

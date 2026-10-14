@@ -7,6 +7,7 @@ import unittest
 import tempfile
 import zipfile
 import warnings
+import subprocess
 from unittest import mock
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
@@ -53,6 +54,47 @@ class LegacyRefreshTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'ambiguous'):
                     refresh.extract_disk(path, root / 'disk.qcow2', 'disk.qcow2')
                 self.assertFalse((root / 'disk.qcow2').exists())
+
+    def test_fedora_ssh_repair_is_idempotent_and_failed_validation_never_publishes(self):
+        producer = self.source()
+        producer.assets.return_value = {'fedora34.qcow2': {'state': 'uploaded'}}
+        with mock.patch.dict(os.environ, GH_TOKEN='fixture'), mock.patch.object(refresh, 'Publisher', return_value=producer) as publisher, mock.patch.object(refresh, 'download'), mock.patch.object(refresh, 'validate_image', side_effect=RuntimeError('boot failed')), mock.patch.object(refresh.subprocess, 'run') as execute:
+            with self.assertRaisesRegex(RuntimeError, 'boot failed'):
+                refresh.refresh('fedora34')
+        self.assertEqual(publisher.call_count, 1)
+        self.assertEqual(execute.call_count, 2)
+        self.assertNotIn('release_assets.py', ' '.join(execute.call_args.args[0]))
+        command = execute.call_args.args[0][execute.call_args.args[0].index('--run-command') + 1]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            ssh = root / 'etc/ssh'
+            snippets = ssh / 'sshd_config.d'
+            snippets.mkdir(parents=True)
+            (ssh / 'sshd_config').write_text('PubkeyAuthentication no\nPasswordAuthentication no\nPermitRootLogin no\nInclude /etc/ssh/sshd_config.d/*.conf\nPort 22\n')
+            (snippets / 'vendor.conf').write_text('PasswordAuthentication no\n')
+            binary = root / 'bin'
+            binary.mkdir()
+            (binary / 'systemctl').write_text('#!/bin/sh\n[ "$1 $2" = "enable sshd" ]\n')
+            (binary / 'systemctl').chmod(0o755)
+            environment = dict(os.environ, PATH=str(binary) + ':' + os.environ['PATH'])
+            for _ in range(2):
+                subprocess.run(['sh', '-c', command.replace('/etc/ssh', str(ssh))], env=environment, check=True, timeout=5)
+            config = (ssh / 'sshd_config').read_text()
+            self.assertTrue(config.startswith('PubkeyAuthentication yes\nPasswordAuthentication yes\nPermitRootLogin yes\n'))
+            self.assertEqual(config.count('PubkeyAuthentication yes'), 1)
+            self.assertIn('Port 22', config)
+            self.assertNotIn('PasswordAuthentication no', (snippets / 'vendor.conf').read_text())
+
+    def test_archived_recovery_disks_are_not_active_published_endpoints(self):
+        import published_image_suite as suite
+        publisher = mock.Mock(base='/fixture')
+        publisher.request.return_value = [
+            {'id': 1, 'draft': False, 'prerelease': False, 'tag_name': 'v2.0'},
+            {'id': 2, 'draft': False, 'prerelease': False, 'tag_name': 'legacy-archived'},
+        ]
+        publisher.assets.return_value = {'debian12.qcow2': {'name': 'debian12.qcow2', 'state': 'uploaded', 'size': 1, 'updated_at': '2026-10-15'}}
+        self.assertEqual(len(suite.published(publisher)), 1)
+        publisher.assets.assert_called_once_with(1)
 
     def test_producer_zip_extracts_exact_qcow2_and_rejects_wrong_format(self):
         for header in [b'QFI\xfb', b'junk']:
