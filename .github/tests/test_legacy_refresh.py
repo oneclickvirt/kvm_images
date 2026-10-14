@@ -4,6 +4,9 @@ import os
 from pathlib import Path
 import sys
 import unittest
+import tempfile
+import zipfile
+import warnings
 from unittest import mock
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
@@ -36,6 +39,36 @@ class LegacyRefreshTests(unittest.TestCase):
         self.assertEqual(execute.call_count, 1)
         self.assertIn('root:password', execute.call_args.args[0][-2])
         self.assertNotIn('release_assets.py', ' '.join(execute.call_args.args[0]))
+
+    def test_producer_zip_extraction_rejects_traversal_and_duplicate_disks(self):
+        for names in [('disk.qcow2', '../outside'), ('disk.qcow2', 'disk.qcow2')]:
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                path = root / 'source.zip'
+                with warnings.catch_warnings(), zipfile.ZipFile(path, 'w') as archive:
+                    warnings.simplefilter('ignore', UserWarning)
+                    archive.writestr('incus.tar.xz', b'metadata')
+                    for name in names:
+                        archive.writestr(name, b'QFI\xfb')
+                with self.assertRaisesRegex(ValueError, 'ambiguous'):
+                    refresh.extract_disk(path, root / 'disk.qcow2', 'disk.qcow2')
+                self.assertFalse((root / 'disk.qcow2').exists())
+
+    def test_producer_zip_extracts_exact_qcow2_and_rejects_wrong_format(self):
+        for header in [b'QFI\xfb', b'junk']:
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                path = root / 'source.zip'
+                data = header + b'\0' * (10 * 1024 * 1024)
+                with zipfile.ZipFile(path, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+                    archive.writestr('incus.tar.xz', b'metadata')
+                    archive.writestr('disk.qcow2', data)
+                if header == b'junk':
+                    with self.assertRaisesRegex(ValueError, 'not QCOW2'):
+                        refresh.extract_disk(path, root / 'disk.qcow2', 'disk.qcow2')
+                else:
+                    refresh.extract_disk(path, root / 'disk.qcow2', 'disk.qcow2')
+                    self.assertEqual((root / 'disk.qcow2').read_bytes(), data)
 
 
 if __name__ == '__main__':
