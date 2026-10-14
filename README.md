@@ -97,3 +97,7 @@ https://down.idc.wiki/Image/realServer-Template/
 Source code (zip)
 
 Source code (tar.gz) 
+
+## Arch 镜像自动维护
+
+旧 `archlinux.qcow2` 自动从组织 `pve_kvm_images` 的持续维护公开源更新。发布前在 GitHub 托管 runner 上验证实际启动、SSH、联网和重启，保留原端点的 root 密码约定。替换前将旧磁盘保存在 `legacy-archived` 发布；新镜像未通过时保留原资产。
