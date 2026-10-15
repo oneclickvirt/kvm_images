@@ -287,13 +287,6 @@ def qemu_cpu_devices(arch, accelerated, compatibility=False):
     return ['-cpu', 'host' if accelerated else 'max', '-smp', '2']
 
 
-def qemu_seed_network():
-    # The NIC sits behind hosted-port5 on both machine types. A concrete
-    # interface in v1 also works with cloud-init's ifupdown/OpenRC renderers,
-    # which cannot reliably render the old wildcard v2 match named "hosted".
-    return 'version: 1\nconfig:\n  - type: physical\n    name: enp5s0\n    subnets:\n      - type: dhcp4\n'
-
-
 def qemu_guest_diagnostics(disk):
     # QEMU must already be stopped. These tools only read the disposable
     # overlay; the published image and its boot configuration stay intact.
@@ -311,7 +304,7 @@ def qemu_guest_diagnostics(disk):
             print('Offline '+title+' diagnostics unavailable: '+type(error).__name__, file=sys.stderr)
 
 
-def qemu_test(folder, disk, provision_key=False):
+def qemu_test(folder, disk):
     arch='arm64' if os.uname().machine=='aarch64' else 'amd64'
     accelerated=kvm_available()
     overlay=folder/'validation-overlay.qcow2'
@@ -324,26 +317,23 @@ def qemu_test(folder, disk, provision_key=False):
     seed=folder/'seed.img';user=folder/'user-data';meta=folder/'meta-data';network=folder/'network-config'
     user.write_text('#cloud-config\nssh_pwauth: false\ndisable_root: false\nusers:\n  - default\n  - name: root\n    lock_passwd: false\n    ssh_authorized_keys:\n      - '+public+'\n')
     meta.write_text('instance-id: hosted-'+uuid.uuid4().hex+'\nlocal-hostname: image-test\n')
-    network.write_text(qemu_seed_network())
+    network.write_text(qemu_network_config())
     run(['cloud-localds','--network-config='+str(network),str(seed),str(user),str(meta)])
-    consumer_password=None
-    if provision_key:
-        # Supply the consumer's login key on the disposable overlay. Do not
-        # install packages, enable missing SSH/network services or change QGA
-        # policy: the original image still has to provide those capabilities.
-        try:
-            consumer_password=secrets.token_urlsafe(32)
-            run(['sudo','virt-customize','-a',str(overlay),'--ssh-inject','root:file:'+str(key.with_suffix('.pub')),
+    # Seed only the temporary overlay so cloud images that ignore the
+    # NoCloud root user entry remain testable without changing the release.
+    try:
+        consumer_password=secrets.token_urlsafe(32)
+        run(['sudo','virt-customize','-a',str(overlay),'--ssh-inject','root:file:'+str(key.with_suffix('.pub')),
              '--root-password','password:'+consumer_password,'--selinux-relabel','--no-network'],capture_output=True,timeout=600,
-                env=dict(os.environ,LIBGUESTFS_BACKEND='direct'))
-        except subprocess.CalledProcessError:
-            raise RuntimeError('consumer key provisioning failed on the disposable overlay') from None
+            env=dict(os.environ,LIBGUESTFS_BACKEND='direct'))
+    except subprocess.CalledProcessError:
+        raise RuntimeError('consumer key provisioning failed on the disposable overlay') from None
     serial=folder/'serial.log';sock=folder/'guest-agent.sock';monitor=folder/'monitor.sock'
     with socket.socket() as listener:
         listener.bind(('127.0.0.1',0));port=listener.getsockname()[1]
     command=['qemu-system-aarch64' if arch=='arm64' else 'qemu-system-x86_64',
              '-machine','virt' if arch=='arm64' else 'q35','-accel','kvm' if accelerated else 'tcg,thread=multi',
-             '-cpu','host' if accelerated else 'max','-m','2048','-smp','2',
+             '-m','2048',
              '-display','none','-serial',f'file:{serial}','-monitor',f'unix:{monitor},server=on,wait=off',
              '-drive',f'file={overlay},format=qcow2,if=none,id=guestdisk','-drive',f'file={seed},format=raw,if=virtio',
              '-netdev',f'user,id=net0,hostfwd=tcp:127.0.0.1:{port}-:22',
@@ -352,8 +342,8 @@ def qemu_test(folder, disk, provision_key=False):
     command += qemu_entropy_devices()
     for bus in range(1,6):
         command+=['-device',f'pcie-root-port,id=hosted-port{bus},chassis={bus},bus=pcie.0,addr={bus+15:#x}']
-    command+=['-device','virtio-net-pci,netdev=net0,bus=hosted-port5,addr=0']
-    log=(folder/'qemu.log').open('wb');process=None;mode='UEFI';storage_mode='virtio';retry_reason=None;transport='QGA';ssh_password=None
+    command+=qemu_network_device()
+    log=(folder/'qemu.log').open('wb');process=None;mode='UEFI';storage_mode='virtio';retry_reason=None;transport='QGA';ssh_password=None;compatibility_cpu=False
     repository=os.environ.get('GITHUB_REPOSITORY','')
     legacy_password='oneclickvirt' if repository.endswith('/pve_kvm_images') else 'password' if repository.endswith('/kvm_images') else None
     def stop():
@@ -369,7 +359,7 @@ def qemu_test(folder, disk, provision_key=False):
         devices=['-device','virtio-blk-pci,drive=guestdisk,bootindex=1']
         if storage=='scsi':devices=['-device','virtio-scsi-pci,id=guest-scsi','-device','scsi-hd,drive=guestdisk,bus=guest-scsi.0,bootindex=1']
         if storage=='sata':devices=['-device','ide-hd,drive=guestdisk,bus=ide.0,bootindex=1']
-        process=subprocess.Popen([command[0]]+devices+command[1:]+([] if bios else firmware(arch,folder)),
+        process=subprocess.Popen([command[0]]+qemu_cpu_devices(arch,accelerated,compatibility_cpu)+devices+command[1:]+([] if bios else firmware(arch,folder)),
                                  stdout=log,stderr=log,env=isolated_environment())
     initial_deadline=None
     readiness_budget=1500 if not accelerated else 600
@@ -410,6 +400,10 @@ def qemu_test(folder, disk, provision_key=False):
                                   '\nShell>' in console or '\nShell> ' in console or
                                   'startup.nsh' in console and 'Press ' in console)
                 stalled_loader=firmware_without_kernel(console) and time.monotonic()-serial_changed>=90
+                if allow_bios and arch=='amd64' and not compatibility_cpu and legacy_kernel_cpu_failure(console):
+                    retry_reason='legacy-cpu'
+                    print('Legacy kernel instruction patching failed; retrying with one compatible x86 CPU within the same boot budget')
+                    return None
                 if allow_bios and arch=='amd64' and mode=='UEFI' and (firmware_shell or stalled_loader):
                     retry_reason='bios'
                     print('UEFI did not reach a guest kernel; retrying the image with SeaBIOS within the same boot budget')
@@ -430,10 +424,11 @@ def qemu_test(folder, disk, provision_key=False):
     try:
         initial_deadline=time.monotonic()+readiness_budget
         start();boot=ready(allow_bios=True)
-        for _ in range(3):
+        for _ in range(4):
             if boot is not None:break
             next_bios=mode=='BIOS' or retry_reason=='bios'
-            next_storage=storage_mode if retry_reason=='bios' else retry_reason
+            next_storage=storage_mode if retry_reason in ('bios','legacy-cpu') else retry_reason
+            if retry_reason=='legacy-cpu':compatibility_cpu=True
             print('Retrying compatible VM boot: '+('BIOS' if next_bios else 'UEFI')+' '+next_storage)
             stop();start(bios=next_bios,storage=next_storage);boot=ready(allow_bios=True)
         if boot is None:raise RuntimeError('VM compatibility retry budget exhausted')
