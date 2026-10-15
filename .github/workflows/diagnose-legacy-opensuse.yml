@@ -1,0 +1,39 @@
+name: Inspect legacy openSUSE boot configuration
+'on':
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: inspect-legacy-opensuse
+  cancel-in-progress: false
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  LIBGUESTFS_BACKEND: direct
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+    - name: Prepare disposable read-only guest inspection
+      run: bash .github/scripts/prepare_hosted_runtime.sh qemu
+    - name: Download the exact public legacy endpoint with checksum validation
+      env:
+        GH_TOKEN: ${{ github.token }}
+        IMAGE: opensuse-leap-15.qcow2
+        TAG: v1.0
+      run: python3 .github/scripts/published_image_suite.py download
+    - name: Inspect only public boot, SSH and DHCP configuration
+      shell: bash
+      run: |
+        set -euo pipefail
+        commands="$RUNNER_TEMP/guest-inspection.txt"
+        for directory in /etc/sysconfig/network /etc/systemd/network /etc/cloud/cloud.cfg.d; do
+          printf 'echo Directory: %s\n-ls %s\n' "$directory" "$directory" >> "$commands"
+        done
+        for file in /etc/os-release /etc/ssh/sshd_config /etc/cloud/cloud.cfg /etc/sysconfig/network/config /etc/sysconfig/network/dhcp /etc/sysconfig/network/ifcfg-eth0 /etc/sysconfig/network/ifcfg-ens3 /etc/sysconfig/network/ifcfg-ens18 /etc/sysconfig/network/ifcfg-enp5s0 /etc/systemd/network/eth0.network /etc/systemd/network/enp5s0.network; do
+          printf 'echo Configuration: %s\n-cat %s\n' "$file" "$file" >> "$commands"
+        done
+        timeout --kill-after=30s 8m guestfish --ro -a opensuse-leap-15.qcow2 -i -f "$commands"
