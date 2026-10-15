@@ -86,6 +86,35 @@ class LegacyRefreshTests(unittest.TestCase):
             self.assertIn('Port 22', config)
             self.assertNotIn('PasswordAuthentication no', (snippets / 'vendor.conf').read_text())
 
+    def test_opensuse_missing_dhcp_repair_preserves_existing_config_and_failed_boot(self):
+        producer = self.source()
+        producer.assets.return_value = {'opensuse-leap-15.qcow2': {'state': 'uploaded'}}
+        with mock.patch.dict(os.environ, GH_TOKEN='fixture'), mock.patch.object(refresh, 'Publisher', return_value=producer) as publisher, mock.patch.object(refresh, 'download'), mock.patch.object(refresh, 'validate_image', side_effect=RuntimeError('boot failed')), mock.patch.object(refresh.subprocess, 'run') as execute:
+            with self.assertRaisesRegex(RuntimeError, 'boot failed'):
+                refresh.refresh('opensuse15')
+        self.assertEqual(publisher.call_count, 1)
+        self.assertEqual(execute.call_count, 2)
+        command = execute.call_args.args[0][execute.call_args.args[0].index('--run-command') + 1]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            network = root / 'network'
+            network.mkdir()
+            (network / 'ifcfg-ens18').write_text('BOOTPROTO=static\nIPADDR=192.0.2.1/24\n')
+            binary = root / 'bin'
+            binary.mkdir()
+            wicked = binary / 'wicked'
+            wicked.write_text('#!/bin/sh\nexit 0\n')
+            wicked.chmod(0o755)
+            (binary / 'systemctl').write_text('#!/bin/sh\nexit 0\n')
+            (binary / 'systemctl').chmod(0o755)
+            command = command.replace('/etc/sysconfig/network', str(network)).replace('/usr/sbin/wicked', str(wicked))
+            environment = dict(os.environ, PATH=str(binary) + ':' + os.environ['PATH'])
+            for _ in range(2):
+                subprocess.run(['sh', '-c', command], env=environment, check=True, timeout=5)
+            self.assertEqual((network / 'ifcfg-ens18').read_text(), 'BOOTPROTO=static\nIPADDR=192.0.2.1/24\n')
+            for interface in ['eth0', 'ens3', 'enp1s0', 'enp5s0']:
+                self.assertEqual((network / ('ifcfg-' + interface)).read_text(), 'BOOTPROTO=dhcp\nSTARTMODE=auto\nDHCLIENT_SET_DEFAULT_ROUTE=yes\n')
+
     def test_archived_recovery_disks_are_not_active_published_endpoints(self):
         import published_image_suite as suite
         publisher = mock.Mock(base='/fixture')

@@ -37,6 +37,9 @@ ENDPOINTS = {
                  'source_image': 'fedora34.qcow2', 'image': 'fedora34.qcow2', 'tag': 'v2.0'},
     'rockylinux8': {'source_repo': 'oneclickvirt/kvm_images', 'source_tag': 'v2.0',
                     'source_image': 'rockylinux8.qcow2', 'image': 'rockylinux8.qcow2', 'tag': 'v2.0'},
+    'opensuse15': {'source_repo': 'oneclickvirt/kvm_images', 'source_tag': 'v1.0',
+                   'source_image': 'opensuse-leap-15.qcow2',
+                   'image': 'opensuse-leap-15.qcow2', 'tag': 'v1.0'},
 }
 
 
@@ -94,6 +97,25 @@ systemctl enable sshd
 """
         subprocess.run(['sudo','virt-customize','-a',str(filename),'--run-command',command,
                         '--selinux-relabel','--no-network'],check=True,timeout=600)
+    if image == 'opensuse15':
+        # The original Leap 15.3 disk has only ifcfg-lo. Wicked cannot request
+        # a lease without an interface definition. Retain its original OS and
+        # DHCP-provided routes/DNS for common QEMU/Proxmox virtio NIC names.
+        command = """set -eu
+test -x /usr/sbin/wicked
+mkdir -p /etc/sysconfig/network
+for interface in eth0 ens3 ens18 enp1s0 enp5s0 enp0s3; do
+  config=/etc/sysconfig/network/ifcfg-$interface
+  if [ ! -e "$config" ]; then
+    printf 'BOOTPROTO=dhcp\\nSTARTMODE=auto\\nDHCLIENT_SET_DEFAULT_ROUTE=yes\\n' > "$config"
+    chmod 0644 "$config"
+  fi
+done
+systemctl enable wicked
+systemctl set-default multi-user.target
+"""
+        subprocess.run(['sudo','virt-customize','-a',str(filename),'--run-command',command,
+                        '--no-network'],check=True,timeout=600)
     validate_image(filename)
     target=Publisher(os.environ['GITHUB_REPOSITORY'],os.environ['GH_TOKEN'])
     old_release=target.request(target.base+'/releases/tags/'+endpoint['tag'])
